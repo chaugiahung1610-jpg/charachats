@@ -46,11 +46,15 @@ function uid() {
   return `c${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function now() {
+  return Date.now();
+}
+
 function makeIntro(char) {
   return {
     role: "assistant",
     content: char.openingMsg || `*${char.name} waves.* "Hey!"`,
-    time: Date.now(),
+    time: now(),
   };
 }
 
@@ -61,8 +65,8 @@ function newConversation(char, firstMessage = "") {
     messages: [makeIntro(char)],
     summary: null,
     feedback: [],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    createdAt: now(),
+    updatedAt: now(),
   };
 }
 
@@ -84,7 +88,7 @@ function normalizeMessage(message) {
   const role = message.role === "assistant" ? "assistant" : message.role === "user" ? "user" : null;
   const content = cleanText(message.content, 12000);
   if (!role || !content) return null;
-  return { role, content, time: Number(message.time) || Date.now() };
+  return { role, content, time: Number(message.time) || now() };
 }
 
 function normalizeConversation(value) {
@@ -100,8 +104,8 @@ function normalizeConversation(value) {
     messages,
     summary: value.summary ? cleanText(value.summary, 3000) : null,
     feedback: Array.isArray(value.feedback) ? value.feedback.map((f) => cleanText(f, 500)).filter(Boolean).slice(-MAX_FEEDBACK) : [],
-    createdAt: Number(value.createdAt) || Date.now(),
-    updatedAt: Number(value.updatedAt) || Date.now(),
+    createdAt: Number(value.createdAt) || now(),
+    updatedAt: Number(value.updatedAt) || now(),
   };
 }
 
@@ -117,7 +121,13 @@ function normalizeConversations(value) {
 
     for (const conversation of Object.values(conversations)) {
       const normalized = normalizeConversation(conversation);
-      if (normalized) next[safeCharId][normalized.id] = normalized;
+      if (normalized) {
+        const firstMessage = normalized.messages[0];
+        if (safeCharId === "alan" && firstMessage?.role === "assistant" && firstMessage.content === `*Alan waves.* "Hey!"`) {
+          normalized.messages[0] = { ...firstMessage, content: ALAN.openingMsg };
+        }
+        next[safeCharId][normalized.id] = normalized;
+      }
     }
   }
 
@@ -265,10 +275,10 @@ export default function App() {
           messages: [],
           summary: null,
           feedback: [],
-          createdAt: Date.now(),
+          createdAt: now(),
           ...(previous[charId]?.[conversationId] || {}),
           ...patch,
-          updatedAt: Date.now(),
+          updatedAt: now(),
         },
       },
     }));
@@ -407,11 +417,11 @@ export default function App() {
     try {
       const reply = await callCharacter(buildSystemPrompt(activeCharacter, activeConversation), history);
       updateConversation(activeCharacter.id, activeConversation.id, {
-        messages: [...history, { role: "assistant", content: reply, time: Date.now() }],
+        messages: [...history, { role: "assistant", content: reply, time: now() }],
       });
     } catch (error) {
       updateConversation(activeCharacter.id, activeConversation.id, {
-        messages: [...history, { role: "assistant", content: apiErrorMessage(error), time: Date.now() }],
+        messages: [...history, { role: "assistant", content: apiErrorMessage(error), time: now() }],
       });
     } finally {
       setLoading(false);
@@ -420,8 +430,8 @@ export default function App() {
 
   async function sendMessage() {
     if (!input.trim() || blocked || !activeCharacter) return;
-    if (Date.now() - lastSend.current < RATE_LIMIT_MS) return;
-    lastSend.current = Date.now();
+    if (now() - lastSend.current < RATE_LIMIT_MS) return;
+    lastSend.current = now();
 
     let conversationId = activeConversationId;
     let conversation = activeConversation;
@@ -441,7 +451,7 @@ export default function App() {
 
     if (editingIndex !== null) {
       const editedMessages = currentMessages.map((message, index) =>
-        index === editingIndex ? { ...message, content: input.trim(), time: Date.now() } : message,
+        index === editingIndex ? { ...message, content: input.trim(), time: now() } : message,
       );
       setInput("");
       setEditingIndex(null);
@@ -459,12 +469,12 @@ export default function App() {
 
       try {
         const reply = await callCharacter(buildSystemPrompt(activeCharacter, conversation), history);
-        const nextMessages = [...history, { role: "assistant", content: reply, time: Date.now() }];
+        const nextMessages = [...history, { role: "assistant", content: reply, time: now() }];
         updateConversation(activeCharacter.id, conversationId, { messages: nextMessages });
         if (nextMessages.length >= COMPRESS_AT) await compressConversation(activeCharacter.id, conversationId, nextMessages, existingSummary);
       } catch (error) {
         updateConversation(activeCharacter.id, conversationId, {
-          messages: [...history, { role: "assistant", content: apiErrorMessage(error), time: Date.now() }],
+          messages: [...history, { role: "assistant", content: apiErrorMessage(error), time: now() }],
         });
       } finally {
         setLoading(false);
@@ -472,7 +482,7 @@ export default function App() {
       return;
     }
 
-    const userMessage = { role: "user", content: input.trim(), time: Date.now() };
+    const userMessage = { role: "user", content: input.trim(), time: now() };
     const withUser = [...currentMessages, userMessage];
     const title = conversation.title === "New conversation" ? userMessage.content.split("\n")[0].slice(0, 50) : conversation.title;
 
@@ -483,12 +493,12 @@ export default function App() {
 
     try {
       const reply = await callCharacter(buildSystemPrompt(activeCharacter, conversation), withUser);
-      const nextMessages = [...withUser, { role: "assistant", content: reply, time: Date.now() }];
+      const nextMessages = [...withUser, { role: "assistant", content: reply, time: now() }];
       updateConversation(activeCharacter.id, conversationId, { messages: nextMessages, title });
       if (nextMessages.length >= COMPRESS_AT) await compressConversation(activeCharacter.id, conversationId, nextMessages, existingSummary);
     } catch (error) {
       updateConversation(activeCharacter.id, conversationId, {
-        messages: [...withUser, { role: "assistant", content: apiErrorMessage(error), time: Date.now() }],
+        messages: [...withUser, { role: "assistant", content: apiErrorMessage(error), time: now() }],
         title,
       });
     } finally {
@@ -1088,7 +1098,14 @@ const styles = {
     outline: "none",
     boxSizing: "border-box",
   },
-  panel: { maxWidth: 720, margin: "0 auto", padding: "30px 22px", display: "grid", gap: 16 },
+panel: {
+  width: "100vw",
+  minHeight: "100vh",
+  padding: "30px 22px",
+  display: "grid",
+  gap: 16,
+  boxSizing: "border-box",
+},
   panelHeader: { display: "flex", alignItems: "center", gap: 12 },
   previewCard: { display: "flex", alignItems: "center", gap: 14, background: "#191a24", border: "1px solid #2a2a38", borderRadius: 12, padding: 18 },
   settingsCard: { background: "#191a24", border: "1px solid #2a2a38", borderRadius: 12, padding: 18 },
