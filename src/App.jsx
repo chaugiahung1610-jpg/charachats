@@ -16,7 +16,7 @@ import ThemeSettingsPanel from "./components/ThemeSettingsPanel";
 import EmotionMatrix from "./components/EmotionMatrix";
 import MemoryBox from "./components/MemoryBox";
 import Avatar from "./components/Avatar";
-import "./styles/layout.css";
+import "./styles/Layout.css";
 
 const BUILT_IN_IDS = new Set(BUILT_IN_CHARACTERS.map((char) => char.id));
 
