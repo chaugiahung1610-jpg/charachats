@@ -8,15 +8,17 @@ import {
   summarizeMessages,
 } from "./services/gemini";
 import { ThemeProvider } from "./context/ThemeContext";
+import { useDeviceSync } from "./hooks/useDeviceSync";
 import Sidebar from "./components/Sidebar";
 import MobileNav from "./components/MobileNav";
 import DiscoverGrid from "./components/DiscoverGrid";
 import StatsDashboard from "./components/StatsDashboard";
 import ThemeSettingsPanel from "./components/ThemeSettingsPanel";
+import SyncPanel from "./components/SyncPanel";
 import EmotionMatrix from "./components/EmotionMatrix";
 import MemoryBox from "./components/MemoryBox";
 import Avatar from "./components/Avatar";
-import "./styles/Layout.css";
+import "./styles/layout.css";
 
 const BUILT_IN_IDS = new Set(BUILT_IN_CHARACTERS.map((char) => char.id));
 
@@ -121,7 +123,7 @@ function normalizeConversation(value) {
   };
 }
 
-function normalizeConversations(value) {
+export function normalizeConversations(value) {
   if (!isRecord(value)) return {};
   const next = {};
 
@@ -146,7 +148,7 @@ function normalizeConversations(value) {
   return next;
 }
 
-function normalizeProfile(value) {
+export function normalizeProfile(value) {
   if (!isRecord(value)) return emptyProfile;
   return {
     name: cleanText(value.name, 80),
@@ -172,7 +174,7 @@ function normalizeCharacter(value) {
   };
 }
 
-function normalizeCharacters(value) {
+export function normalizeCharacters(value) {
   return Array.isArray(value) ? value.map(normalizeCharacter).filter(Boolean) : [];
 }
 
@@ -371,6 +373,16 @@ function AppShell() {
   const [emotionStates, setEmotionStates] = useState(() => readJson("cc_emotions", {}));
   const [pinnedDetails, setPinnedDetails] = useState(() => readJson("cc_pins", {}));
   const [memoryBoxOpen, setMemoryBoxOpen] = useState(false);
+
+  // Feature: cross-device sync (off by default, see useDeviceSync.js)
+  const deviceSync = useDeviceSync({
+    conversations,
+    setConversations,
+    profile,
+    setProfile,
+    customCharacters,
+    setCustomCharacters,
+  });
 
   const lastSend = useRef(0);
   const endRef = useRef(null);
@@ -1136,6 +1148,7 @@ function AppShell() {
         <main style={styles.panel}>
           <HeaderBack title="Settings" onBack={() => setView("home")} />
           <ThemeSettingsPanel />
+          <SyncPanel {...deviceSync} />
 
           <section style={styles.settingsCard}>
             <h3>Gemini setup</h3>
